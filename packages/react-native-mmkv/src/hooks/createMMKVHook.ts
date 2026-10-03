@@ -36,7 +36,7 @@ export function createMMKVHook<
           })
           // The value might have changed between render and subscribe
           const latestValue = getter(mmkv, key)
-          if (!Object.is(latestValue, cachedValue.current)) {
+          if (latestValue !== cachedValue.current) {
             cachedValue.current = latestValue
             onStoreChange()
           }

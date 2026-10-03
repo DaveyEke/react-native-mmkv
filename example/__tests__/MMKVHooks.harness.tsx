@@ -28,6 +28,20 @@ function BufferProbe({ storage }: { storage: MMKV }): null {
   return null;
 }
 
+let renders: { requested: string; got: string | undefined }[] = [];
+
+function KeyProbe({
+  storage,
+  storageKey,
+}: {
+  storage: MMKV;
+  storageKey: string;
+}): null {
+  const [value] = useMMKVString(storageKey, storage);
+  renders.push({ requested: storageKey, got: value });
+  return null;
+}
+
 describe('MMKV Hooks', () => {
   let storage: MMKV;
 
@@ -59,5 +73,40 @@ describe('MMKV Hooks', () => {
 
     await waitFor(() => expect(renderCount).toBeGreaterThan(0));
     expect(renderCount).toBeLessThan(5);
+  });
+
+  it('reads the new value when the key changes', async () => {
+    storage.set('key-a', 'value a');
+    storage.set('key-b', 'value b');
+    renders = [];
+
+    const { rerender } = await render(
+      <KeyProbe storage={storage} storageKey="key-a" />,
+    );
+    renders = [];
+
+    await rerender(<KeyProbe storage={storage} storageKey="key-b" />);
+
+    expect(renders).toStrictEqual([{ requested: 'key-b', got: 'value b' }]);
+  });
+
+  it('reads the new value when the instance changes', async () => {
+    const otherStorage = createMMKV({ id: 'hooks-test-other' });
+    otherStorage.clearAll();
+    storage.set('shared-key', 'from first');
+    otherStorage.set('shared-key', 'from second');
+    renders = [];
+
+    const { rerender } = await render(
+      <KeyProbe storage={storage} storageKey="shared-key" />,
+    );
+    renders = [];
+
+    await rerender(<KeyProbe storage={otherStorage} storageKey="shared-key" />);
+
+    expect(renders).toStrictEqual([
+      { requested: 'shared-key', got: 'from second' },
+    ]);
+    otherStorage.clearAll();
   });
 });
